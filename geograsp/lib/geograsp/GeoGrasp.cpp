@@ -83,6 +83,14 @@ float GeoGrasp::getBestRanking() const {
   return this->getRanking(0);
 }
 
+pcl::PointCloud<pcl::PointNormal> GeoGrasp::getFirstPointRadiusNormalCloud() const {
+  return *firstPointRadiusNormalCloud;
+}
+
+pcl::PointCloud<pcl::PointNormal> GeoGrasp::getSecondPointRadiusNormalCloud() const {
+  return *secondPointRadiusNormalCloud;
+}
+
 void GeoGrasp::compute() {
   // Some ratios dependant of the gripper
   const float voxelRadius = this->gripTipSize / 2000.0;
@@ -238,8 +246,15 @@ void GeoGrasp::compute() {
   voxelizeCloud<pcl::PointCloud<pcl::PointNormal>::Ptr, 
                 pcl::VoxelGrid<pcl::PointNormal> >(secondPointRadiusNormalCloud, 
                   voxelRadius, this->secondNormalCloudVoxel);
+ 
+  // Just use the initial points 
+  GraspConfiguration initialGrasp;
+  initialGrasp.firstPoint = this->firstGraspPoint;
+  initialGrasp.secondPoint = this->secondGraspPoint;
 
-  // Best ranking
+  this->graspPoints.insert(this->graspPoints.begin(), initialGrasp);
+
+  /* Best ranking
   getBestGraspingPoints(this->firstGraspPoint, this->secondGraspPoint, 
     this->graspPlaneCoeff, this->objectCentroidPoint, this->firstNormalCloudVoxel,
     this->secondNormalCloudVoxel, this->numberBestGrasps, this->graspPoints,
@@ -248,7 +263,7 @@ void GeoGrasp::compute() {
   for (size_t i = 0; i < this->rankings.size(); ++i)
     std::cout << "Grasp Configuration Rank: " << this->rankings[i] << "\n";
 
-  std::cout << "===============================\n";
+  std::cout << "===============================\n";*/
 }
 
 

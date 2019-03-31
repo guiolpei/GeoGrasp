@@ -10,10 +10,11 @@
 #include <pcl/visualization/pcl_visualizer.h>
 #include <pcl/visualization/point_cloud_color_handlers.h>
 
+#include <pcl/filters/extract_indices.h>
 #include <pcl/filters/passthrough.h>
+#include <pcl/filters/voxel_grid.h>
 
 #include <pcl/ModelCoefficients.h>
-#include <pcl/filters/extract_indices.h>
 
 #include <pcl/sample_consensus/method_types.h>
 #include <pcl/sample_consensus/model_types.h>
@@ -23,6 +24,20 @@
 #include <geograsp/GeoGrasp.h>
 
 pcl::visualization::PCLVisualizer::Ptr viewer(new pcl::visualization::PCLVisualizer("Cloud viewer"));
+
+void processRadiusCloud(pcl::PointCloud<pcl::PointNormal>::Ptr cloud, const std::string & fileName) {
+  pcl::io::savePCDFileBinary(fileName + "-original.pcd", *cloud);
+
+  pcl::PointCloud<pcl::PointNormal>::Ptr cloudVoxel(new pcl::PointCloud<pcl::PointNormal>);
+  pcl::VoxelGrid<pcl::PointNormal> voxelFilter;
+  float leafSize = 0.015;
+
+  voxelFilter.setInputCloud(cloud);
+  voxelFilter.setLeafSize(leafSize, leafSize, leafSize);
+  voxelFilter.filter(*cloudVoxel);
+
+  pcl::io::savePCDFileBinary(fileName + "-voxel.pcd", *cloudVoxel);
+}
 
 // callback signature
 void cloudCallback(const sensor_msgs::PointCloud2ConstPtr & inputCloudMsg) {
@@ -143,8 +158,29 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr & inputCloudMsg) {
 
       viewer->addSphere(bestGrasp.firstPoint, 0.01, 0, 0, 255, objectLabel + "First best grasp point");
       viewer->addSphere(bestGrasp.secondPoint, 0.01, 255, 0, 0, objectLabel + "Second best grasp point");
+
+      // Visualize radius (normal) clouds
+      pcl::PointCloud<pcl::PointNormal>::Ptr firstPointRadiusNormalCloud(new pcl::PointCloud<pcl::PointNormal>());
+      *firstPointRadiusNormalCloud = geoGraspPoints.getFirstPointRadiusNormalCloud();
+      pcl::PointCloud<pcl::PointNormal>::Ptr secondPointRadiusNormalCloud(new pcl::PointCloud<pcl::PointNormal>());
+      *secondPointRadiusNormalCloud = geoGraspPoints.getSecondPointRadiusNormalCloud();
+      
+
+      pcl::visualization::PointCloudColorHandlerGenericField<pcl::PointNormal> 
+        firstPointNormalColorHandler(firstPointRadiusNormalCloud, "curvature");
+      pcl::visualization::PointCloudColorHandlerGenericField<pcl::PointNormal>
+        secondPointNormalColorHandler(secondPointRadiusNormalCloud, "curvature");
+  
+      viewer->addPointCloud<pcl::PointNormal>(firstPointRadiusNormalCloud, firstPointNormalColorHandler, 
+                                            objectLabel + "First point normals cloud");
+
+      viewer->addPointCloud<pcl::PointNormal>(secondPointRadiusNormalCloud, secondPointNormalColorHandler, 
+                                            objectLabel + "Second point normals cloud");
       
       objectNumber++;
+
+      processRadiusCloud(firstPointRadiusNormalCloud, "first-cloud");
+      processRadiusCloud(secondPointRadiusNormalCloud, "second-cloud");
     }
 
     // viewer->spinOnce();

@@ -48,6 +48,9 @@ class GeoGrasp {
 
     GraspConfiguration getGrasp(const int & index) const;
     GraspConfiguration getBestGrasp() const;
+    
+    pcl::PointCloud<pcl::PointNormal> getFirstPointRadiusNormalCloud() const;
+    pcl::PointCloud<pcl::PointNormal> getSecondPointRadiusNormalCloud() const;
 
     float getRanking(const int & index) const;
     float getBestRanking() const;
