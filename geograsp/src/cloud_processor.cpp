@@ -12,7 +12,7 @@
 
 #include <pcl/filters/extract_indices.h>
 #include <pcl/filters/passthrough.h>
-#include <pcl/filters/voxel_grid.h>
+#include <pcl/filters/random_sample.h>
 
 #include <pcl/ModelCoefficients.h>
 
@@ -28,15 +28,22 @@ pcl::visualization::PCLVisualizer::Ptr viewer(new pcl::visualization::PCLVisuali
 void processRadiusCloud(pcl::PointCloud<pcl::PointNormal>::Ptr cloud, const std::string & fileName) {
   pcl::io::savePCDFileBinary(fileName + "-original.pcd", *cloud);
 
-  pcl::PointCloud<pcl::PointNormal>::Ptr cloudVoxel(new pcl::PointCloud<pcl::PointNormal>);
-  pcl::VoxelGrid<pcl::PointNormal> voxelFilter;
-  float leafSize = 0.015;
+  /* 
+   * This sampling can be used for data augmentation and for normalising the number of points in the
+   * clouds so the PointNet can be used.
+   
+  pcl::PointCloud<pcl::PointNormal>::Ptr cloudSampled(new pcl::PointCloud<pcl::PointNormal>);
+  pcl::RandomSample<pcl::PointNormal> randSampler;
+  int samples = 100;
 
-  voxelFilter.setInputCloud(cloud);
-  voxelFilter.setLeafSize(leafSize, leafSize, leafSize);
-  voxelFilter.filter(*cloudVoxel);
+  randSampler.setInputCloud(cloud);
+  randSampler.setSample(samples);
+  //randSampler.setSeed(rand());
+  randSampler.filter(*cloudSampled);
 
-  pcl::io::savePCDFileBinary(fileName + "-voxel.pcd", *cloudVoxel);
+  pcl::io::savePCDFileBinary(fileName + "-sampled.pcd", *cloudSampled);
+
+   */
 }
 
 // callback signature
@@ -47,9 +54,6 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr & inputCloudMsg) {
   // Remove NaN values and make it dense
   std::vector<int> nanIndices;
   pcl::removeNaNFromPointCloud(*cloud, *cloud, nanIndices);
-
-  // Save to file
-  //pcl::io::savePCDFileBinary("original-cloud.pcd", *cloud);
 
   // Remove background points
   pcl::PassThrough<pcl::PointXYZRGB> ptFilter;
