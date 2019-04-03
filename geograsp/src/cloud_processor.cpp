@@ -26,24 +26,7 @@
 pcl::visualization::PCLVisualizer::Ptr viewer(new pcl::visualization::PCLVisualizer("Cloud viewer"));
 
 void processRadiusCloud(pcl::PointCloud<pcl::PointNormal>::Ptr cloud, const std::string & fileName) {
-  pcl::io::savePCDFileBinary(fileName + "-original.pcd", *cloud);
-
-  /* 
-   * This sampling can be used for data augmentation and for normalising the number of points in the
-   * clouds so the PointNet can be used.
-   
-  pcl::PointCloud<pcl::PointNormal>::Ptr cloudSampled(new pcl::PointCloud<pcl::PointNormal>);
-  pcl::RandomSample<pcl::PointNormal> randSampler;
-  int samples = 100;
-
-  randSampler.setInputCloud(cloud);
-  randSampler.setSample(samples);
-  //randSampler.setSeed(rand());
-  randSampler.filter(*cloudSampled);
-
-  pcl::io::savePCDFileBinary(fileName + "-sampled.pcd", *cloudSampled);
-
-   */
+  pcl::io::savePCDFileBinary(fileName + ".pcd", *cloud);
 }
 
 // callback signature
@@ -183,8 +166,8 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr & inputCloudMsg) {
       
       objectNumber++;
 
-      processRadiusCloud(firstPointRadiusNormalCloud, "first-cloud");
-      processRadiusCloud(secondPointRadiusNormalCloud, "second-cloud");
+      processRadiusCloud(firstPointRadiusNormalCloud, objectLabel + "cloud-first");
+      processRadiusCloud(secondPointRadiusNormalCloud, objectLabel + "cloud-second");
     }
 
     // viewer->spinOnce();
