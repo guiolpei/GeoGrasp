@@ -128,22 +128,15 @@ void GeoGrasp::compute() {
   Eigen::Vector3f objAxisVector(this->objectAxisCoeff->values[3],
                                 this->objectAxisCoeff->values[4],
                                 this->objectAxisCoeff->values[5]);
-  Eigen::Vector3f backNormalVector(this->backgroundPlaneCoeff->values[0],
-                                   this->backgroundPlaneCoeff->values[1],
-                                   this->backgroundPlaneCoeff->values[2]);
-  Eigen::Vector3f worldZVector(0, 0, 1);
+  Eigen::Vector3f worldXVector(1, 0, 0);
 
-  float objGraspNormalAngleCos = std::abs((objAxisVector.dot(backNormalVector)) / 
-    (objAxisVector.norm() * backNormalVector.norm()));
-  float objWorldZAngleCos = std::abs((objAxisVector.dot(worldZVector)) / 
-    (objAxisVector.norm() * worldZVector.norm()));
+  float objWorldXAngleCos = std::abs((objAxisVector.dot(worldXVector)) / 
+    (objAxisVector.norm() * worldXVector.norm()));
 
-  std::cout << "Object angle cosine to background normal: " << objGraspNormalAngleCos << "\n";
-  std::cout << "Object angle cosine to world Z: " << objWorldZAngleCos << "\n";
+  std::cout << "Object angle cosine to world X: " << objWorldXAngleCos << "\n";
 
-  // Grasping plane and initial points
-  float planesAngleThreshold = 0.55, worldZAngleThreshold = 0.45;
-  size_t firstPointIndex = -1, secondPointIndex = -1;
+  /*
+  float planesAngleThreshold = 0.55;
   bool oppositeAxisVector = false;
 
   // Standing object but vector pointing down
@@ -170,34 +163,37 @@ void GeoGrasp::compute() {
       this->objectAxisCoeff->values[5] *= -1.0;
 
       objAxisVector = -objAxisVector;
-  }
+  }*/
 
   buildGraspingPlane(this->objectCentroidPoint, objAxisVector, 
     kGraspPlaneApprox, this->objectNormalCloud, this->graspPlaneCoeff, 
     this->graspPlaneCloud);
 
-  // Laying object in the X axis
-  if (objGraspNormalAngleCos < planesAngleThreshold 
-    && objWorldZAngleCos < worldZAngleThreshold) {
+  // Grasping plane and initial points
+  float worldXAngleThreshold = 0.5;
+  size_t firstPointIndex = -1, secondPointIndex = -1;
+
+  // Object in the X axis
+  if (objWorldXAngleCos > worldXAngleThreshold) {
     std::cout << "It is a laying object in the X axis\n";
 
-    float minZ = std::numeric_limits<float>::max();
-    float maxZ = -std::numeric_limits<float>::max();
+    float minY = std::numeric_limits<float>::max();
+    float maxY = -std::numeric_limits<float>::max();
 
     for (size_t i = 0; i < this->graspPlaneCloud->points.size(); ++i) {
-      if (this->graspPlaneCloud->points[i].z < minZ) {
-        minZ = this->graspPlaneCloud->points[i].z;
+      if (this->graspPlaneCloud->points[i].y < minY) {
+        minY = this->graspPlaneCloud->points[i].y;
         firstPointIndex = i;
       }
 
-      if (this->graspPlaneCloud->points[i].z > maxZ) {
-        maxZ = this->graspPlaneCloud->points[i].z;
+      if (this->graspPlaneCloud->points[i].y > maxY) {
+        maxY = this->graspPlaneCloud->points[i].y;
         secondPointIndex = i;
       }
     }
   }
-  else { // Standing objects and laying ones in the Z axis
-    std::cout << "It is a laying object in the Z axis or it is standing\n";
+  else { // Object in the Y axis
+    std::cout << "It is a laying object in the Y axis\n";
 
     float minX = std::numeric_limits<float>::max();
     float maxX = -std::numeric_limits<float>::max();
