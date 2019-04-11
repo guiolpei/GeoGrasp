@@ -24,13 +24,13 @@
 #include <geograsp/GeoGrasp.h>
 #include <geograsp/GraspConfigMsg.h>
 
+const std::string GRASP_CONFIG_TOPIC = "/geograsp/grasp_config";
+const int SHADOW_GRIP_TIP = 25; // In mm
+
 pcl::visualization::PCLVisualizer::Ptr viewer(new pcl::visualization::PCLVisualizer("Cloud viewer"));
+ros::Publisher pub;
 
-void processRadiusCloud(pcl::PointCloud<pcl::PointNormal>::Ptr cloud, const std::string & fileName) {
-  pcl::io::savePCDFileBinary(fileName + ".pcd", *cloud);
-}
-
-// callback signature
+// Callback function for processing 3D point clouds
 void cloudCallback(const sensor_msgs::PointCloud2ConstPtr & inputCloudMsg) {
   pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZRGB>());
   pcl::fromROSMsg(*inputCloudMsg, *cloud);
@@ -110,6 +110,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr & inputCloudMsg) {
   }
   else {
     std::vector<pcl::PointIndices>::const_iterator it = clusterIndices.begin();
+    std::vector<geograsp::GraspConfigMsg> computedGrasps;
     int objectNumber = 0;
 
     viewer->removeAllPointClouds();
@@ -133,6 +134,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr & inputCloudMsg) {
       GeoGrasp geoGraspPoints;
       geoGraspPoints.setBackgroundCloud(cloudPlane);
       geoGraspPoints.setObjectCloud(objectCloud);
+      geoGraspPoints.setGripTipSize(SHADOW_GRIP_TIP);
 
       // Calculate grasping points
       geoGraspPoints.compute();
@@ -141,7 +143,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr & inputCloudMsg) {
       GraspConfiguration bestGrasp = geoGraspPoints.getBestGrasp();
 
       pcl::ModelCoefficients objAxisCoeff = geoGraspPoints.getObjectAxisCoeff();
-      std::cout << "## Obj axis: " << objAxisCoeff << "\n";
+      std::cout << "Obj axis: " << objAxisCoeff << "\n";
 
       // Visualize the result
       std::string objectLabel = "";
@@ -186,8 +188,8 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr & inputCloudMsg) {
                                             objectLabel + "Second point normals cloud");
       
       // Save the grasping clouds
-      processRadiusCloud(firstPointRadiusNormalCloud, objectLabel + "cloud-first");
-      processRadiusCloud(secondPointRadiusNormalCloud, objectLabel + "cloud-second");
+      pcl::io::savePCDFileBinary(objectLabel + "cloud-first" + ".pcd", *firstPointRadiusNormalCloud);
+      pcl::io::savePCDFileBinary(objectLabel + "cloud-second" + ".pcd", *secondPointRadiusNormalCloud);
 
       // Build GraspConfigMsg
       geograsp::GraspConfigMsg graspMsg;
@@ -205,8 +207,13 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr & inputCloudMsg) {
       graspMsg.obj_axis_coeff_5 = objAxisCoeff.values[5];
       pcl::toROSMsg<pcl::PointXYZRGB>(*objectCloud, graspMsg.object_cloud);
 
+      computedGrasps.push_back(graspMsg);
+
       objectNumber++;
     }
+    
+    // Publish the grasp configuration of the first object
+    pub.publish(computedGrasps[0]);
 
     viewer->spinOnce();
     /*while (!viewer->wasStopped())
@@ -226,6 +233,7 @@ int main(int argc, char **argv) {
   n.getParam("topic", cloudTopic);
 
   ros::Subscriber sub = n.subscribe<sensor_msgs::PointCloud2>(cloudTopic, 1, cloudCallback);
+  pub = n.advertise<geograsp::GraspConfigMsg>(GRASP_CONFIG_TOPIC, 1);
 
   ros::spin();
 
