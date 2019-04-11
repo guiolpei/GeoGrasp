@@ -66,6 +66,18 @@ GraspConfiguration GeoGrasp::getBestGrasp() const {
   return this->getGrasp(0);
 }
 
+pcl::ModelCoefficients GeoGrasp::getObjectAxisCoeff() const {
+  return *objectAxisCoeff;
+}
+
+pcl::PointCloud<pcl::PointNormal> GeoGrasp::getFirstPointRadiusNormalCloud() const {
+  return *firstPointRadiusNormalCloud;
+}
+
+pcl::PointCloud<pcl::PointNormal> GeoGrasp::getSecondPointRadiusNormalCloud() const {
+  return *secondPointRadiusNormalCloud;
+}
+
 float GeoGrasp::getRanking(const int & index) const {
   float ranking;
 
@@ -81,14 +93,6 @@ float GeoGrasp::getRanking(const int & index) const {
 
 float GeoGrasp::getBestRanking() const {
   return this->getRanking(0);
-}
-
-pcl::PointCloud<pcl::PointNormal> GeoGrasp::getFirstPointRadiusNormalCloud() const {
-  return *firstPointRadiusNormalCloud;
-}
-
-pcl::PointCloud<pcl::PointNormal> GeoGrasp::getSecondPointRadiusNormalCloud() const {
-  return *secondPointRadiusNormalCloud;
 }
 
 void GeoGrasp::compute() {
@@ -129,53 +133,57 @@ void GeoGrasp::compute() {
                                 this->objectAxisCoeff->values[4],
                                 this->objectAxisCoeff->values[5]);
   Eigen::Vector3f worldXVector(1, 0, 0);
+  Eigen::Vector3f worldZVector(0, 0, 1);
 
   float objWorldXAngleCos = std::abs((objAxisVector.dot(worldXVector)) / 
     (objAxisVector.norm() * worldXVector.norm()));
+  float objWorldZAngleCos = std::abs((objAxisVector.dot(worldZVector)) / 
+    (objAxisVector.norm() * worldZVector.norm()));
 
   std::cout << "Object angle cosine to world X: " << objWorldXAngleCos << "\n";
+  std::cout << "Object angle cosine to world Z: " << objWorldZAngleCos << "\n";
 
   /*
-  float planesAngleThreshold = 0.55;
-  bool oppositeAxisVector = false;
+   For multifingered hands, the estimated orientation of the object is important
+   so the computed grasping points and the resulting grasp pose are oriented in a
+   "comfortable" way. That is, the approaching vector should force the hand to
+   have its thumb pointing up. For grippers, this is not an issue.
 
-  // Standing object but vector pointing down
-  if (objGraspNormalAngleCos > (1.0 - planesAngleThreshold) && 
-    this->objectAxisCoeff->values[4] > 0.0)
-        oppositeAxisVector = true;
-  else if (objGraspNormalAngleCos < planesAngleThreshold) { // Laying objects
-    // Laying in the X direction but vector point left
-    if (objWorldZAngleCos <= 0.1 && this->objectAxisCoeff->values[3] > 0.0)
-        oppositeAxisVector = true;
-    // Laying and pointing forward-right but vector points backwards-left
-    else if (objWorldZAngleCos > 0.1 && this->objectAxisCoeff->values[3] < 0.0 &&
-      this->objectAxisCoeff->values[4] > 0.0 && this->objectAxisCoeff->values[5] < 0.0)
-        oppositeAxisVector = true;
-    // Laying and pointing forward-left but vector points backwards-right
-    else if (objWorldZAngleCos > 0.1 && this->objectAxisCoeff->values[3] > 0.0 &&
-      this->objectAxisCoeff->values[4] > 0.0 && this->objectAxisCoeff->values[5] < 0.0)
-        oppositeAxisVector = true;
+   This part of the code (reversing the object's axis) is tuned for a right hand.
+   */
+  float worldXAngleThreshold = 0.5, worldZAngleThreshold = 0.25;
+  bool reverseAxisVector = false;
+
+  if (objWorldZAngleCos < worldZAngleThreshold) { // Laying objects
+    // Object in the X axis but vector pointing right
+    if (objWorldXAngleCos > worldXAngleThreshold && this->objectAxisCoeff->values[3] > 0)
+      reverseAxisVector = true;
+    // Object in the Y axis but vector pointing forward from the robot
+    else if (objWorldXAngleCos < worldXAngleThreshold && this->objectAxisCoeff->values[4] < 0)
+      reverseAxisVector = true;
   }
+  // Standing object but vector pointing down with the Z axis
+  else if (objWorldZAngleCos > worldZAngleThreshold && this->objectAxisCoeff->values[5] > 0)
+    reverseAxisVector = true;
 
-  if (oppositeAxisVector) {
+  if (reverseAxisVector) {
       this->objectAxisCoeff->values[3] *= -1.0;
       this->objectAxisCoeff->values[4] *= -1.0;
       this->objectAxisCoeff->values[5] *= -1.0;
 
       objAxisVector = -objAxisVector;
-  }*/
+  }
+
+  // Grasping plane and initial points
+  size_t firstPointIndex = -1, secondPointIndex = -1;
 
   buildGraspingPlane(this->objectCentroidPoint, objAxisVector, 
     kGraspPlaneApprox, this->objectNormalCloud, this->graspPlaneCoeff, 
     this->graspPlaneCloud);
 
-  // Grasping plane and initial points
-  float worldXAngleThreshold = 0.5;
-  size_t firstPointIndex = -1, secondPointIndex = -1;
-
   // Object in the X axis
   if (objWorldXAngleCos > worldXAngleThreshold) {
-    std::cout << "It is a laying object in the X axis\n";
+    std::cout << "It is oriented with the X axis\n";
 
     float minY = std::numeric_limits<float>::max();
     float maxY = -std::numeric_limits<float>::max();
@@ -193,7 +201,7 @@ void GeoGrasp::compute() {
     }
   }
   else { // Object in the Y axis
-    std::cout << "It is a laying object in the Y axis\n";
+    std::cout << "It is oriented with the Y axis\n";
 
     float minX = std::numeric_limits<float>::max();
     float maxX = -std::numeric_limits<float>::max();

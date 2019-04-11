@@ -6,12 +6,22 @@ find_package(catkin REQUIRED COMPONENTS
   pcl_ros
   roscpp
   sensor_msgs
+  std_msgs
 )
 
 find_package(Boost COMPONENTS program_options REQUIRED)
 
+add_message_files (DIRECTORY msg
+  FILES
+  GraspConfigMsg.msg
+)
+
+generate_messages(
+  DEPENDENCIES sensor_msgs std_msgs
+)
+
 catkin_package(
-  CATKIN_DEPENDS pcl_conversions pcl_ros roscpp sensor_msgs
+  CATKIN_DEPENDS pcl_conversions pcl_ros roscpp sensor_msgs std_msgs
   DEPENDS Boost
   INCLUDE_DIRS include
   LIBRARIES GeoGrasp

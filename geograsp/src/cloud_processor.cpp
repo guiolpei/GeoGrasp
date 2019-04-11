@@ -22,6 +22,7 @@
 #include <pcl/segmentation/extract_clusters.h>
 
 #include <geograsp/GeoGrasp.h>
+#include <geograsp/GraspConfigMsg.h>
 
 pcl::visualization::PCLVisualizer::Ptr viewer(new pcl::visualization::PCLVisualizer("Cloud viewer"));
 
@@ -38,11 +39,21 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr & inputCloudMsg) {
   std::vector<int> nanIndices;
   pcl::removeNaNFromPointCloud(*cloud, *cloud, nanIndices);
 
-  // Remove background points
+  // Remove everything out of the working space (table)
   pcl::PassThrough<pcl::PointXYZRGB> ptFilter;
   ptFilter.setInputCloud(cloud);
   ptFilter.setFilterFieldName("z");
   ptFilter.setFilterLimits(0.0, 1.5);
+  ptFilter.filter(*cloud);
+
+  ptFilter.setInputCloud(cloud);
+  ptFilter.setFilterFieldName("y");
+  ptFilter.setFilterLimits(-0.55, 0.40);
+  ptFilter.filter(*cloud);
+
+  ptFilter.setInputCloud(cloud);
+  ptFilter.setFilterFieldName("x");
+  ptFilter.setFilterLimits(-0.70, 0.30);
   ptFilter.filter(*cloud);
 
   // Create the segmentation object for the planar model and set all the parameters
@@ -54,7 +65,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr & inputCloudMsg) {
   sacSegmentator.setModelType(pcl::SACMODEL_PLANE);
   sacSegmentator.setMethodType(pcl::SAC_RANSAC);
   sacSegmentator.setMaxIterations(50);
-  sacSegmentator.setDistanceThreshold(0.01);
+  sacSegmentator.setDistanceThreshold(0.025);
   sacSegmentator.setInputCloud(cloud);
   sacSegmentator.segment(*inliers, *coefficients);
 
@@ -106,6 +117,8 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr & inputCloudMsg) {
 
     // Every cluster found is considered an object
     for (it = clusterIndices.begin(); it != clusterIndices.end(); ++it) {
+      std::cout << "======================================\n";
+
       pcl::PointCloud<pcl::PointXYZRGB>::Ptr objectCloud(new pcl::PointCloud<pcl::PointXYZRGB>());
 
       for (std::vector<int>::const_iterator pit = it->indices.begin(); 
@@ -127,12 +140,10 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr & inputCloudMsg) {
       // Extract best pair of points
       GraspConfiguration bestGrasp = geoGraspPoints.getBestGrasp();
 
-      // Visualize the result
-      pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGB> rgb(objectCloud);
-      pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZRGB> planeColor(cloudPlane, 
-        0, 155, 0);
-      pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGB> planeRGB(cloudPlane);
+      pcl::ModelCoefficients objAxisCoeff = geoGraspPoints.getObjectAxisCoeff();
+      std::cout << "## Obj axis: " << objAxisCoeff << "\n";
 
+      // Visualize the result
       std::string objectLabel = "";
       std::ostringstream converter;
 
@@ -140,9 +151,19 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr & inputCloudMsg) {
       objectLabel += converter.str();
       objectLabel += "-";
 
+      pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGB> rgb(objectCloud);
+      pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZRGB> planeColor(cloudPlane, 
+        0, 155, 0);
+      pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGB> planeRGB(cloudPlane);
+
+      // Visualize the object and the table
       viewer->addPointCloud<pcl::PointXYZRGB>(objectCloud, rgb, objectLabel + "Object");
       viewer->addPointCloud<pcl::PointXYZRGB>(cloudPlane, planeRGB, objectLabel + "Plane");
 
+      // Visualize the object's axis
+      viewer->addLine(objAxisCoeff, objectLabel + "Axis vector");
+
+      // Visualize grasping points
       viewer->addSphere(bestGrasp.firstPoint, 0.01, 0, 0, 255, objectLabel + "First best grasp point");
       viewer->addSphere(bestGrasp.secondPoint, 0.01, 255, 0, 0, objectLabel + "Second best grasp point");
 
@@ -152,7 +173,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr & inputCloudMsg) {
       pcl::PointCloud<pcl::PointNormal>::Ptr secondPointRadiusNormalCloud(new pcl::PointCloud<pcl::PointNormal>());
       *secondPointRadiusNormalCloud = geoGraspPoints.getSecondPointRadiusNormalCloud();
       
-
+      // Visualize the curvature of their areas
       pcl::visualization::PointCloudColorHandlerGenericField<pcl::PointNormal> 
         firstPointNormalColorHandler(firstPointRadiusNormalCloud, "curvature");
       pcl::visualization::PointCloudColorHandlerGenericField<pcl::PointNormal>
@@ -164,15 +185,32 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr & inputCloudMsg) {
       viewer->addPointCloud<pcl::PointNormal>(secondPointRadiusNormalCloud, secondPointNormalColorHandler, 
                                             objectLabel + "Second point normals cloud");
       
-      objectNumber++;
-
+      // Save the grasping clouds
       processRadiusCloud(firstPointRadiusNormalCloud, objectLabel + "cloud-first");
       processRadiusCloud(secondPointRadiusNormalCloud, objectLabel + "cloud-second");
+
+      // Build GraspConfigMsg
+      geograsp::GraspConfigMsg graspMsg;
+      graspMsg.first_point_x = bestGrasp.firstPoint.x;
+      graspMsg.first_point_y = bestGrasp.firstPoint.y;
+      graspMsg.first_point_z = bestGrasp.firstPoint.z;
+      graspMsg.second_point_x = bestGrasp.secondPoint.x;
+      graspMsg.second_point_y = bestGrasp.secondPoint.y;
+      graspMsg.second_point_z = bestGrasp.secondPoint.z;
+      graspMsg.obj_axis_coeff_0 = objAxisCoeff.values[0];
+      graspMsg.obj_axis_coeff_1 = objAxisCoeff.values[1];
+      graspMsg.obj_axis_coeff_2 = objAxisCoeff.values[2];
+      graspMsg.obj_axis_coeff_3 = objAxisCoeff.values[3];
+      graspMsg.obj_axis_coeff_4 = objAxisCoeff.values[4];
+      graspMsg.obj_axis_coeff_5 = objAxisCoeff.values[5];
+      pcl::toROSMsg<pcl::PointXYZRGB>(*objectCloud, graspMsg.object_cloud);
+
+      objectNumber++;
     }
 
-    // viewer->spinOnce();
-    while (!viewer->wasStopped())
-      viewer->spinOnce(100);
+    viewer->spinOnce();
+    /*while (!viewer->wasStopped())
+      viewer->spinOnce(100);*/
   }
 }
 

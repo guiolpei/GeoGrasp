@@ -49,6 +49,8 @@ class GeoGrasp {
     GraspConfiguration getGrasp(const int & index) const;
     GraspConfiguration getBestGrasp() const;
     
+    pcl::ModelCoefficients getObjectAxisCoeff() const;
+    
     pcl::PointCloud<pcl::PointNormal> getFirstPointRadiusNormalCloud() const;
     pcl::PointCloud<pcl::PointNormal> getSecondPointRadiusNormalCloud() const;
 
@@ -84,7 +86,7 @@ class GeoGrasp {
     std::vector<float> pointsDistance;
 
     int numberBestGrasps;
-    int gripTipSize;
+    int gripTipSize; //mm
 
     // Auxiliary functions
 
