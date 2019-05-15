@@ -1,4 +1,5 @@
 #include <iostream>
+#include <ctime>
 
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h>
@@ -29,6 +30,32 @@ const int SHADOW_GRIP_TIP = 25; // In mm
 
 pcl::visualization::PCLVisualizer::Ptr viewer(new pcl::visualization::PCLVisualizer("Cloud viewer"));
 ros::Publisher pub;
+
+void saveData(const pcl::PointCloud<pcl::PointNormal>::Ptr cloudFirst, 
+    const pcl::PointCloud<pcl::PointNormal>::Ptr cloudSecond, 
+    const pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloudObject,
+    const GraspConfiguration & bestGrasp) {
+  std::time_t epoch = std::time(nullptr);
+  std::ostringstream converter;
+  converter << epoch;
+
+  std::string folderName = converter.str();
+  mkdir(folderName.c_str(), 0777);
+
+  pcl::io::savePCDFileBinary(folderName + "/cloud-first.pcd", *cloudFirst);
+  pcl::io::savePCDFileBinary(folderName + "/cloud-second.pcd", *cloudSecond);
+  pcl::io::savePCDFileBinary(folderName + "/cloud-object.pcd", *cloudObject);
+
+  std::ofstream outFile;
+  outFile.open(folderName + "/best-grasp.txt", std::ios_base::app);
+
+  outFile << bestGrasp.firstPoint.x << ",";
+  outFile << bestGrasp.firstPoint.y << ",";
+  outFile << bestGrasp.firstPoint.z << ",";
+  outFile << bestGrasp.secondPoint.x << ",";
+  outFile << bestGrasp.secondPoint.y << ",";
+  outFile << bestGrasp.secondPoint.z;
+}
 
 // Callback function for processing 3D point clouds
 void cloudCallback(const sensor_msgs::PointCloud2ConstPtr & inputCloudMsg) {
@@ -187,9 +214,8 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr & inputCloudMsg) {
       viewer->addPointCloud<pcl::PointNormal>(secondPointRadiusNormalCloud, secondPointNormalColorHandler, 
                                             objectLabel + "Second point normals cloud");
       
-      // Save the grasping clouds
-      pcl::io::savePCDFileBinary(objectLabel + "cloud-first" + ".pcd", *firstPointRadiusNormalCloud);
-      pcl::io::savePCDFileBinary(objectLabel + "cloud-second" + ".pcd", *secondPointRadiusNormalCloud);
+      // Save info
+      saveData(firstPointRadiusNormalCloud, secondPointRadiusNormalCloud, objectCloud, bestGrasp);
 
       // Build GraspConfigMsg
       geograsp::GraspConfigMsg graspMsg;
@@ -215,9 +241,9 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr & inputCloudMsg) {
     // Publish the grasp configuration of the first object
     pub.publish(computedGrasps[0]);
 
-    viewer->spinOnce();
-    /*while (!viewer->wasStopped())
-      viewer->spinOnce(100);*/
+    //viewer->spinOnce();
+    while (!viewer->wasStopped())
+      viewer->spinOnce(100);
   }
 }
 
