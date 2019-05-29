@@ -116,7 +116,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr & inputCloudMsg) {
   std::vector<pcl::PointIndices> clusterIndices;
   pcl::EuclideanClusterExtraction<pcl::PointXYZRGB> ecExtractor;
   ecExtractor.setClusterTolerance(0.01);
-  ecExtractor.setMinClusterSize(750);
+  ecExtractor.setMinClusterSize(200);
   //ecExtractor.setMaxClusterSize(25000);
   ecExtractor.setSearchMethod(tree);
   ecExtractor.setInputCloud(cloud);
