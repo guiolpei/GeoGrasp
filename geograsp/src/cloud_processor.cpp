@@ -26,7 +26,7 @@
 #include <geograsp/GraspConfigMsg.h>
 
 const std::string GRASP_CONFIG_TOPIC = "/geograsp/grasp_config";
-const int SHADOW_GRIP_TIP = 25; // In mm
+const int SHADOW_GRIP_TIP = 25; //25; // In mm
 
 pcl::visualization::PCLVisualizer::Ptr viewer(new pcl::visualization::PCLVisualizer("Cloud viewer"));
 ros::Publisher pub;
@@ -80,7 +80,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr & inputCloudMsg) {
 
   ptFilter.setInputCloud(cloud);
   ptFilter.setFilterFieldName("x");
-  ptFilter.setFilterLimits(-0.70, 0.30);
+  ptFilter.setFilterLimits(-0.50, 0.30); //(-0.70, 0.30);
   ptFilter.filter(*cloud);
 
   // Create the segmentation object for the planar model and set all the parameters
@@ -215,7 +215,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr & inputCloudMsg) {
                                             objectLabel + "Second point normals cloud");
       
       // Save info
-      saveData(firstPointRadiusNormalCloud, secondPointRadiusNormalCloud, objectCloud, bestGrasp);
+      //saveData(firstPointRadiusNormalCloud, secondPointRadiusNormalCloud, objectCloud, bestGrasp);
 
       // Build GraspConfigMsg
       geograsp::GraspConfigMsg graspMsg;

@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <math.h>
+#include <random>
 
 #include <Eigen/Dense>
 #include <Eigen/Geometry>

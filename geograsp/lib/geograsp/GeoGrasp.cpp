@@ -258,7 +258,7 @@ void GeoGrasp::compute() {
 
   this->graspPoints.insert(this->graspPoints.begin(), initialGrasp);
 
-  /* Best ranking
+  /* Best ranking */
   getBestGraspingPoints(this->firstGraspPoint, this->secondGraspPoint, 
     this->graspPlaneCoeff, this->objectCentroidPoint, this->firstNormalCloudVoxel,
     this->secondNormalCloudVoxel, this->numberBestGrasps, this->graspPoints,
@@ -266,8 +266,6 @@ void GeoGrasp::compute() {
 
   for (size_t i = 0; i < this->rankings.size(); ++i)
     std::cout << "Grasp Configuration Rank: " << this->rankings[i] << "\n";
-
-  std::cout << "===============================\n";*/
 }
 
 
@@ -340,9 +338,17 @@ void GeoGrasp::computeCloudGeometry(
   objAxisCoeff->values[4] = majorVector[1];
   objAxisCoeff->values[5] = majorVector[2];
 
-  objCenterMass.x = massCenter[0];
-  objCenterMass.y = massCenter[1];
-  objCenterMass.z = massCenter[2];
+  // Only introduced at data collection for the vision2tactile project!
+  std::random_device dev;
+  std::mt19937 rng(dev());
+  std::uniform_real_distribution<> rndDist(-0.1, 0.1);
+  float randDisplacement = rndDist(rng);
+
+  std::cout << "randDisplacement:" << randDisplacement << "\n";
+
+  objCenterMass.x = randDisplacement * majorVector[0] + massCenter[0];
+  objCenterMass.y = randDisplacement * majorVector[1] + massCenter[1];
+  objCenterMass.z = randDisplacement * majorVector[2] + massCenter[2];
 }
 
 template<typename T, typename U>
