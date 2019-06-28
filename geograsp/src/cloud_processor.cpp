@@ -92,7 +92,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr & inputCloudMsg) {
   sacSegmentator.setModelType(pcl::SACMODEL_PLANE);
   sacSegmentator.setMethodType(pcl::SAC_RANSAC);
   sacSegmentator.setMaxIterations(50);
-  sacSegmentator.setDistanceThreshold(0.025);
+  sacSegmentator.setDistanceThreshold(0.065);//(0.025);
   sacSegmentator.setInputCloud(cloud);
   sacSegmentator.segment(*inliers, *coefficients);
 
@@ -215,7 +215,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr & inputCloudMsg) {
                                             objectLabel + "Second point normals cloud");
       
       // Save info
-      //saveData(firstPointRadiusNormalCloud, secondPointRadiusNormalCloud, objectCloud, bestGrasp);
+      saveData(firstPointRadiusNormalCloud, secondPointRadiusNormalCloud, objectCloud, bestGrasp);
 
       // Build GraspConfigMsg
       geograsp::GraspConfigMsg graspMsg;

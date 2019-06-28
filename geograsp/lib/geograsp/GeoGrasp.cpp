@@ -258,14 +258,14 @@ void GeoGrasp::compute() {
 
   this->graspPoints.insert(this->graspPoints.begin(), initialGrasp);
 
-  /* Best ranking */
+  /* Best ranking
   getBestGraspingPoints(this->firstGraspPoint, this->secondGraspPoint, 
     this->graspPlaneCoeff, this->objectCentroidPoint, this->firstNormalCloudVoxel,
     this->secondNormalCloudVoxel, this->numberBestGrasps, this->graspPoints,
     this->rankings);
 
   for (size_t i = 0; i < this->rankings.size(); ++i)
-    std::cout << "Grasp Configuration Rank: " << this->rankings[i] << "\n";
+    std::cout << "Grasp Configuration Rank: " << this->rankings[i] << "\n";*/
 }
 
 
