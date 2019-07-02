@@ -341,8 +341,12 @@ void GeoGrasp::computeCloudGeometry(
   // Only introduced at data collection for the vision2tactile project!
   std::random_device dev;
   std::mt19937 rng(dev());
-  std::uniform_real_distribution<> rndDist(-0.1, 0.1);
-  float randDisplacement = rndDist(rng);
+  //std::uniform_real_distribution<> rndDist(-0.1, 0.1);
+  std::uniform_int_distribution<> rndDist(0, 5);
+  float randDisplacement = rndDist(rng) / 100.0;
+  
+  if (rndDist(rng) >= 5)
+    randDisplacement *= -1;
 
   std::cout << "randDisplacement:" << randDisplacement << "\n";
 
