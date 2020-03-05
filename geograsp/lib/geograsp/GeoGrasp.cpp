@@ -50,8 +50,8 @@ void GeoGrasp::setGripTipSize(const int & size) {
   gripTipSize = size;
 }
 
-GraspConfiguration GeoGrasp::getBestGrasp() const {
-  GraspConfiguration grasp;
+GraspContacts GeoGrasp::getBestGrasp() const {
+  GraspContacts grasp;
 
   if (this->graspPoints.empty())
     std::cout << "No grasp configurations were found during the computation\n";
@@ -63,16 +63,51 @@ GraspConfiguration GeoGrasp::getBestGrasp() const {
   return grasp;
 }
 
-std::vector<GraspConfiguration> GeoGrasp::getGrasps() const {
+std::vector<GraspContacts> GeoGrasp::getGrasps() const {
   return this->graspPoints;
 }
 
-pcl::ModelCoefficients GeoGrasp::getObjectAxisCoeff() const {
-  return *objectAxisCoeff;
-}
+GraspPose GeoGrasp::getBestGraspPose() const {
+  GraspPose grasp;
 
-pcl::ModelCoefficients GeoGrasp::getBackgroundPlaneCoeff() const {
-  return *backgroundPlaneCoeff;
+  if (this->graspPoints.empty())
+    std::cout << "No grasp configurations were found during the computation\n";
+  else {
+    grasp.firstPoint[0] = this->graspPoints[0].firstPoint.x;
+    grasp.firstPoint[1] = this->graspPoints[0].firstPoint.y;
+    grasp.firstPoint[2] = this->graspPoints[0].firstPoint.z;
+
+    grasp.secondPoint[0] = this->graspPoints[0].secondPoint.x;
+    grasp.secondPoint[1] = this->graspPoints[0].secondPoint.y;
+    grasp.secondPoint[2]= this->graspPoints[0].secondPoint.z;
+
+    /*Eigen::Vector3f midPoint((grasp.firstPoint[0] + grasp.secondPoint[0]) / 2.0,
+                             (grasp.firstPoint[1] + grasp.secondPoint[1]) / 2.0,
+                             (grasp.firstPoint[2] + grasp.secondPoint[2]) / 2.0);*/
+    Eigen::Vector3f midPoint = (grasp.firstPoint + grasp.secondPoint) / 2.0;
+
+    Eigen::Vector3f objAxisVector(this->objectAxisCoeff->values[3],
+                                  this->objectAxisCoeff->values[4],
+                                  this->objectAxisCoeff->values[5]);
+    Eigen::Vector3f axeX, axeY, axeZ;
+  
+    axeZ = grasp.firstPoint - grasp.secondPoint;
+    axeX = axeZ.cross(objAxisVector);
+    axeY = axeZ.cross(axeX);
+   
+    axeX.normalize();
+    axeY.normalize();
+    axeZ.normalize();    
+
+    Eigen::Matrix3f midPointRotation;
+    midPointRotation << axeX[0], axeY[0], axeZ[0], 
+                        axeX[1], axeY[1], axeZ[1],
+                        axeX[2], axeY[2], axeZ[2];
+    grasp.midPointPose.translation() = midPoint;
+    grasp.midPointPose.linear() = midPointRotation;
+  }
+
+  return grasp;
 }
 
 float GeoGrasp::getBestRanking() const {
@@ -88,6 +123,14 @@ float GeoGrasp::getBestRanking() const {
 
 std::vector<float> GeoGrasp::getRankings() const {
   return this->rankings;
+}
+
+pcl::ModelCoefficients GeoGrasp::getObjectAxisCoeff() const {
+  return *objectAxisCoeff;
+}
+
+pcl::ModelCoefficients GeoGrasp::getBackgroundPlaneCoeff() const {
+  return *backgroundPlaneCoeff;
 }
 
 void GeoGrasp::compute() {
@@ -153,7 +196,7 @@ void GeoGrasp::compute() {
   float objWidth = pcl::geometry::distance(this->firstGraspPoint.getVector3fMap(),
     this->secondGraspPoint.getVector3fMap());
 
-  if (graspRadius * 2 >= objWidth)
+  if (graspRadius * 2.0 >= objWidth)
     graspRadius = objWidth * 0.7 / 2.0;
 
   // Grasping areas
@@ -185,9 +228,8 @@ void GeoGrasp::compute() {
   std::cout << "===============================\n";
 }
 
-
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// - - - - - - - - - - - - - - - AUXILIARY FUNCTIONS - - - - - - - - - - - - - - -
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 void GeoGrasp::computeCloudPlane(
@@ -494,8 +536,7 @@ void GeoGrasp::buildGraspingPlane(const pcl::PointXYZ & planePoint,
 }
 
 void GeoGrasp::getClosestPointsByRadius(const pcl::PointNormal & point,
-    const float & radius,
-    const pcl::PointCloud<pcl::PointXYZ>::Ptr & inputCloud,
+    const float & radius, const pcl::PointCloud<pcl::PointXYZ>::Ptr & inputCloud,
     const pcl::PointCloud<pcl::PointNormal>::Ptr & inputNormalCloud,
     pcl::PointCloud<pcl::PointXYZ>::Ptr pointsCloud,
     pcl::PointCloud<pcl::PointNormal>::Ptr normalCloud) {
@@ -534,9 +575,9 @@ void GeoGrasp::voxelizeCloud(const T & inputCloud, const float & leafSize,
 //    - angle between the line formed by the grasping points and their normals
 //
 // In addition, these ranked points cannot be closer to the centroid than the
-// initial points to avoid searching in the objects facing surface, and their
+// initial points to avoid searching in the objects facing surface, and they
 // must be distanced from each other at least as the initial points. 
-// Furtheremore, those new points cannot be closer to the other side initial
+// Furthermore, those new points cannot be closer to the other side initial
 // points.
 //
 // @param firstInitialPoint -> Point in the first area which is the initial 
@@ -560,9 +601,9 @@ void GeoGrasp::getBestGraspingPoints(
     const pcl::PointXYZ & centroidPoint,
     const pcl::PointCloud<pcl::PointNormal>::Ptr & firstNormalCloud,
     const pcl::PointCloud<pcl::PointNormal>::Ptr & secondNormalCloud,
-    const int & numGrasps, std::vector<GraspConfiguration> & bestGrasps,
+    const int & numGrasps, std::vector<GraspContacts> & bestGrasps,
     std::vector<float> & bestRanks) {
-  const float weightR1 = 1.5, weightR2 = 1.0; // TODO: FIND BEST VALUES FOR W1 AND W2
+  const float weightR1 = 1.5, weightR2 = 1.0; // BEST VALUES FOR W1 AND W2
 
   ////////////////////////////////////////////////////////////////////////////////
   // First we obtain the min and max values in order to normalize data
@@ -658,7 +699,6 @@ void GeoGrasp::getBestGraspingPoints(
     centroidVector);
   float pointRank1 = 0.0, pointRank2 = 0.0, pointRank = 0.0;
   float epsilon = 1e-8; // Needed to avoid division by zero
-  const float e = 2.71828182845904523536;
 
   firstMinDistance = (firstMinDistance + epsilon - firstCentroidDistanceMin) /
                     (firstCentroidDistanceMax - firstCentroidDistanceMin);
@@ -755,14 +795,18 @@ void GeoGrasp::getBestGraspingPoints(
         continue;
 
       size_t rank = 0;
-      std::vector<GraspConfiguration>::iterator graspsIt;
+      std::vector<GraspContacts>::iterator graspsIt;
 
       for (rank = 0, graspsIt = bestGrasps.begin(); rank < bestRanks.size(); 
           ++rank, ++graspsIt) {
         if (pointRank > bestRanks[rank]) {
-          GraspConfiguration newGrasp;
-          newGrasp.firstPoint = firstPoint;
-          newGrasp.secondPoint = secondPoint;
+          GraspContacts newGrasp;
+          newGrasp.firstPoint.x = firstPoint.x;
+          newGrasp.firstPoint.y = firstPoint.y;
+          newGrasp.firstPoint.z = firstPoint.z;
+          newGrasp.secondPoint.x = secondPoint.x;
+          newGrasp.secondPoint.y = secondPoint.y;
+          newGrasp.secondPoint.z = secondPoint.z;
 
           bestRanks.insert(bestRanks.begin() + rank, pointRank);
           bestGrasps.insert(graspsIt, newGrasp);
@@ -777,10 +821,10 @@ void GeoGrasp::getBestGraspingPoints(
   bestGrasps.resize(numGrasps);
 
   ////////////////////////////////////////////////////////////////////////////////
-  // No grasp configurations found
+  // No grasp configurations found, then add initial points
 
   if (std::numeric_limits<float>::min() == *bestRanks.begin()) {
-    GraspConfiguration newGrasp;
+    GraspContacts newGrasp;
     newGrasp.firstPoint.x = firstInitialPoint.x;
     newGrasp.firstPoint.y = firstInitialPoint.y;
     newGrasp.firstPoint.z = firstInitialPoint.z;
